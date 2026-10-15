@@ -1,0 +1,20 @@
+[braintrust]
+project = "pineapple-bernard"
+dataset = "Bernard reviewed moments"
+
+[models]
+jev = "jev-latest"
+luna = "gpt-6-luna"
+luna_reasoning_effort = "medium"
+judge = "openai/gpt-6-astra"
+reflection = "openai/gpt-6-astra"
+
+[prompts]
+jev = "prompts/bernard_jev.txt"
+luna = "prompts/bernard_luna.txt"
+
+[gepa]
+max_metric_calls = 60
+min_reviews = 20
+min_rooms = 6
+min_judge_agreement = 0.8
