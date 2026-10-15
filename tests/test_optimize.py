@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 
 import dspy
@@ -49,7 +50,7 @@ def test_judge_must_match_both_human_classes():
 
 def test_baseline_and_candidate_use_same_heldout_cases():
     _, _, test = split_cases(fake_cases())
-    settings = load_settings()
+    settings = replace(load_settings(), typesafe_key="fake", openai_key="fake")
 
     def post(url, key, payload):
         if "questions" in payload:
@@ -77,7 +78,7 @@ def test_no_reviews_stop_before_provider_call():
 
 
 def test_gepa_can_change_both_provider_prompts():
-    settings = load_settings()
+    settings = replace(load_settings(), typesafe_key="fake", openai_key="fake")
 
     def post(url, key, payload):
         if "questions" in payload:
