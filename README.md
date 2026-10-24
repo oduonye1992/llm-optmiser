@@ -6,6 +6,12 @@ You review call moments in Braintrust. This tool copies only complete reviews to
 
 The code, seed prompts, and examples in this repo are public. The examples are made up. Keep call text, keys, review reasons, reports, and candidate prompts out of Git.
 
+The [Philomena Cunk interview research](docs/philomena-cunk-research.md) links to aired transcripts and maps the interview style to Jev and Luna. It includes original examples, not show scripts.
+
+The Button examples draw on [Quickest Rejection in Button History?](https://www.youtube.com/watch?v=DUPXwNlp1mA), [Reject Your Date With One Press of a Button](https://www.youtube.com/watch?v=EoJjvEwWuxE), and [Men & Women Compete in Brutal Speed Dating Game](https://www.youtube.com/watch?v=J7Ku0LiaV1w). The Button asks about a fact, a choice, or a weak answer that just came up. In [I Voiced the Button](https://www.youtube.com/watch?v=HgeZGYy5LEQ), Cody Ko says he watched the date and picked when to cut in. The new cases use these moves, not lines from the show.
+
+The new cases are made up and marked `source: synthetic`. Their `example_line` shows a possible line for review. The fixed scores check the choice and hard rules; they do not judge humor. Only your real call reviews go into `Bernard reviewed moments`.
+
 ## Quick start
 
 Install [uv](https://docs.astral.sh/uv/). Then run:
@@ -23,13 +29,14 @@ Fill in the three keys in `.env`. The local file is ignored by Git. `config.toml
 | Jev choice model | `models.jev` | `JEV_MODEL` |
 | Luna line model | `models.luna` | `LUNA_MODEL` |
 | Luna effort | `models.luna_reasoning_effort` | `LUNA_REASONING_EFFORT` |
+| Luna reply token cap | `models.luna_max_completion_tokens` | `LUNA_MAX_COMPLETION_TOKENS` |
 | Line judge model | `models.judge` | `JUDGE_MODEL` |
 | GEPA reflection model | `models.reflection` | `REFLECTION_MODEL` |
 | Jev seed prompt | `prompts.jev` | `JEV_PROMPT` |
 | Luna seed prompt | `prompts.luna` | `LUNA_PROMPT` |
 | GEPA call cap | `gepa.max_metric_calls` | `MAX_METRIC_CALLS` |
 
-The seed prompts came from `livekit-agent/src/bernard_prompts.py` in Pineapple. The source file SHA-256 was `09700a8ae8094547bae59638eef9ce6d9332808213c5ec251108051f0912a0ee` when they were copied. The runner sends Jev and Luna the same request fields as Bernard's `decision_client.py`. A test checks exact request bodies when that local agent checkout is present.
+The seed prompts began as copies of `livekit-agent/src/bernard_prompts.py` in Pineapple. The source file SHA-256 was `597ed937d45d5ca4a041bc87de7b95288ed72accc18ad4131cb9b49debd4c70f` when they were copied. The offline seeds now give Jev only the choice job and Luna only the line job. They differ from the live prompts. The runner uses the same request fields as Bernard's `decision_client.py`. A test checks the request fields and call context when that local agent checkout is present.
 
 ## What is one example?
 
@@ -79,7 +86,10 @@ Use `--config path/to/config.toml` **before** the command to load another config
 - `sync` reads paged project logs. It writes complete reviews into the private Braintrust dataset. It also writes `data/reviewed.jsonl` and a small version file. That folder is ignored by Git. The command prints counts, the Braintrust version, and a SHA-256 hash of the fixed snapshot. It does not print call text.
 - `check-judge` tests the judge on old Luna lines in the check split. It hides the old Pass or Fail value from the judge. It stops if agreement is below 80% or either review class is missing.
 - `optimize` needs at least 20 complete reviews from 6 calls. It also needs 6 wanted speaks, 6 wanted silences, 2 Luna Pass reviews, and 2 Luna Fail reviews. It keeps whole calls together when it splits the rows. GEPA uses the train and check rows. It gets a number and a written reason for each try. It does not see the final test rows. The run saves `candidate_jev.txt`, `candidate_luna.txt`, and `manifest.json` under ignored `runs/<run-id>/`.
+- GEPA rejects a draft that asks Jev to write a line, asks Luna to choose silence, or copies a known name or long phrase from reviewed calls. The chosen prompts face the same check. A text check can miss a reworded private story, so read chosen prompts before sharing them.
 - `evaluate` checks that the snapshot and seed prompts still match that run. It tests the old pair and the candidate pair on the **same** held-out rows. It also runs fixed Bernard safety cases. It writes two Braintrust experiments and `report.json`. A provider error or missing score fails the command.
+
+If GEPA keeps the seed prompt, `evaluate` says `prompt_changed=false`. It skips the held-out calls and experiments because there is no new prompt to compare. The run record also saves Luna's reasoning effort and reply token cap. `evaluate` stops if either setting changed.
 
 The score gives Jev a full point for a correct silence. A wrong choice gets zero. A correct speak gets half a point plus up to half a point from the line judge. A hard-rule miss gets zero. A candidate counts as better only if it beats the old pair on the held-out rows and has no hard-rule miss. The judge is a model that reads your written reasons; GEPA does not come with your taste built in. See the [DSPy GEPA guide](https://dspy.ai/3.4.1/getting-started/gepa-optimization/) for the search method.
 

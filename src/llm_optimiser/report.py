@@ -88,6 +88,8 @@ def publish_experiments(
         "dataset_version": dataset_version,
         "jev_model": settings.jev_model,
         "luna_model": settings.luna_model,
+        "luna_reasoning_effort": settings.luna_reasoning_effort,
+        "luna_max_completion_tokens": settings.luna_max_completion_tokens,
         "judge_model": settings.judge_model,
         "judge_agreement": judge_agreement,
         "baseline_jev_hash": prompt_hash(baseline.choose.signature.instructions),

@@ -60,6 +60,24 @@ def test_silent_row_only_needs_jev_review():
     assert case_from_log(row).luna_score is None
 
 
+def test_reads_braintrust_comment_text_and_skips_codex_drafts():
+    row = log_row()
+    row["comments"] = [
+        {
+            "comment": {"text": "Jev: Wrong time.\nLuna: Too plain."},
+            "metadata": {"reviewer": "Codex", "review_status": "draft"},
+        },
+        {
+            "comment": {"text": "Jev: Good time to ask.\nLuna: Too plain."},
+            "metadata": {},
+        },
+    ]
+    case = case_from_log(row)
+    assert case is not None
+    assert case.jev_reason == "Good time to ask."
+    assert case.luna_reason == "Too plain."
+
+
 def test_reject_transcript_invalid_score_and_conflict():
     row = log_row()
     row["metadata"]["kind"] = "full_call_transcript"
