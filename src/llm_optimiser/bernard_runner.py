@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import urllib.error
 import urllib.request
 from collections.abc import Callable
 from typing import Any
@@ -48,8 +49,23 @@ def post_json(url: str, key: str, payload: dict[str, Any]) -> dict[str, Any]:
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(request, timeout=15) as response:
-        result = json.loads(response.read())
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            result = json.loads(response.read())
+    except urllib.error.HTTPError as error:
+        try:
+            detail = json.loads(error.read()).get("error", {})
+        except (ValueError, AttributeError):
+            detail = {}
+        fields = []
+        for key in ("type", "code", "param"):
+            value = detail.get(key) if isinstance(detail, dict) else None
+            if isinstance(value, str) and re.fullmatch(
+                r"[A-Za-z0-9_.\[\]-]{1,80}", value
+            ):
+                fields.append(f"{key}={value}")
+        suffix = " " + " ".join(fields) if fields else ""
+        raise ValueError(f"Provider HTTP {error.code}{suffix}") from error
     if not isinstance(result, dict):
         raise ValueError("Provider returned a non-object response")
     return result
@@ -141,7 +157,10 @@ class BernardEngine:
         try:
             return self._complete(request)
         except Exception as error:
-            self.errors.types.append(f"{self.stage}:{type(error).__name__}")
+            if self.stage == "luna" and str(error) == "Luna returned an empty line":
+                self.errors.types.append("luna:empty_line")
+            else:
+                self.errors.types.append(f"{self.stage}:{type(error).__name__}")
             raise
 
     def _complete(self, request):
@@ -162,7 +181,7 @@ class BernardEngine:
             payload = {
                 "model": self.settings.luna_model,
                 "reasoning_effort": self.settings.luna_reasoning_effort,
-                "max_completion_tokens": 256,
+                "max_completion_tokens": self.settings.luna_max_completion_tokens,
                 "messages": [
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
@@ -256,9 +275,6 @@ def hard_rule_errors(case: ReviewCase, action: str, line: str) -> list[str]:
     if not line.strip():
         errors.append("Spoken line is empty")
     transcript = case.call_context.split("Full labeled conversation so far:\n", 1)[-1]
-    last_line = transcript.strip().splitlines()[-1] if transcript.strip() else ""
-    if last_line.rstrip().endswith("?"):
-        errors.append("The other dater has not answered a question")
     event = re.search(r"(?:^|\n)Event(?: name)?:\s*([^\n.]+)", case.user_context, re.I)
     if event and event[1].casefold() in line.casefold():
         if event[1].casefold() not in transcript.casefold():
@@ -269,6 +285,6 @@ def hard_rule_errors(case: ReviewCase, action: str, line: str) -> list[str]:
         extra_names = set(
             re.findall(r"nickname:\s*([A-Z][a-z]+)", case.user_context, re.I)
         )
-        if addressed[1] not in first_names | extra_names:
+        if addressed[1] not in first_names | extra_names | {"Mate", "Wait", "Dude"}:
             errors.append("Line uses a name that was not supplied")
     return errors

@@ -18,6 +18,7 @@ class Settings:
     jev_model: str
     luna_model: str
     luna_reasoning_effort: str
+    luna_max_completion_tokens: int
     judge_model: str
     reflection_model: str
     jev_prompt: Path
@@ -46,6 +47,12 @@ def load_settings(config_path: Path | None = None) -> Settings:
         value = Path(setting("prompts", key, env))
         return value if value.is_absolute() else root / value
 
+    luna_max_completion_tokens = int(
+        setting("models", "luna_max_completion_tokens", "LUNA_MAX_COMPLETION_TOKENS")
+    )
+    if luna_max_completion_tokens < 1:
+        raise ValueError("Luna reply token cap must be positive")
+
     return Settings(
         root=root,
         project=setting("braintrust", "project", "BRAINTRUST_PROJECT"),
@@ -55,6 +62,7 @@ def load_settings(config_path: Path | None = None) -> Settings:
         luna_reasoning_effort=setting(
             "models", "luna_reasoning_effort", "LUNA_REASONING_EFFORT"
         ),
+        luna_max_completion_tokens=luna_max_completion_tokens,
         judge_model=setting("models", "judge", "JUDGE_MODEL"),
         reflection_model=setting("models", "reflection", "REFLECTION_MODEL"),
         jev_prompt=prompt_path("jev", "JEV_PROMPT"),

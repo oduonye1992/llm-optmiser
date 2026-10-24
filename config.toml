@@ -6,6 +6,7 @@ dataset = "Bernard reviewed moments"
 jev = "jev-latest"
 luna = "gpt-6-luna"
 luna_reasoning_effort = "medium"
+luna_max_completion_tokens = 256
 judge = "openai/gpt-6-astra"
 reflection = "openai/gpt-6-astra"
 

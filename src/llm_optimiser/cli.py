@@ -88,9 +88,19 @@ def main() -> None:
             if args.command == "check-judge":
                 result = check_judge(val, judge, max(0.8, settings.min_judge_agreement))
             else:
-                require_provider_keys(settings, braintrust=args.command == "evaluate")
-                check = check_judge(val, judge, max(0.8, settings.min_judge_agreement))
+                model_settings = {
+                    "jev": settings.jev_model,
+                    "luna": settings.luna_model,
+                    "luna_reasoning_effort": settings.luna_reasoning_effort,
+                    "luna_max_completion_tokens": settings.luna_max_completion_tokens,
+                    "judge": settings.judge_model,
+                    "reflection": settings.reflection_model,
+                }
                 if args.command == "optimize":
+                    require_provider_keys(settings)
+                    check = check_judge(
+                        val, judge, max(0.8, settings.min_judge_agreement)
+                    )
                     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
                     run_dir = settings.root / "runs" / stamp
                     baseline = make_program(
@@ -115,15 +125,22 @@ def main() -> None:
                         "seed_jev_hash": prompt_hash(settings.jev_prompt.read_text()),
                         "seed_luna_hash": prompt_hash(settings.luna_prompt.read_text()),
                         "candidate_hashes": hashes,
-                        "models": {
-                            "jev": settings.jev_model,
-                            "luna": settings.luna_model,
-                            "judge": settings.judge_model,
-                            "reflection": settings.reflection_model,
-                        },
+                        "models": model_settings,
                     }
                     save_report(run_dir / "manifest.json", manifest)
-                    result = {"run": str(run_dir), "candidate_hashes": hashes}
+                    prompt_changed = any(
+                        original.signature.instructions.strip()
+                        != updated.signature.instructions.strip()
+                        for original, updated in (
+                            (baseline.choose, candidate.choose),
+                            (baseline.write, candidate.write),
+                        )
+                    )
+                    result = {
+                        "run": str(run_dir),
+                        "candidate_hashes": hashes,
+                        "prompt_changed": prompt_changed,
+                    }
                 else:
                     run_dir = args.run.resolve()
                     manifest = json.loads((run_dir / "manifest.json").read_text())
@@ -133,13 +150,7 @@ def main() -> None:
                         )
                     if [case.source_id for case in test] != manifest["test_ids"]:
                         raise ValueError("Held-out test IDs changed since optimization")
-                    current_models = {
-                        "jev": settings.jev_model,
-                        "luna": settings.luna_model,
-                        "judge": settings.judge_model,
-                        "reflection": settings.reflection_model,
-                    }
-                    if current_models != manifest["models"]:
+                    if model_settings != manifest["models"]:
                         raise ValueError("Model settings changed since optimization")
                     if (
                         prompt_hash(settings.jev_prompt.read_text())
@@ -164,16 +175,34 @@ def main() -> None:
                     }
                     if candidate_hashes != manifest["candidate_hashes"]:
                         raise ValueError("Candidate prompts changed since optimization")
-                    result = publish_experiments(
-                        settings,
-                        test,
-                        baseline,
-                        candidate,
-                        judge,
-                        run_dir,
-                        manifest["dataset_version"],
-                        check["agreement"],
-                    )
+                    if (
+                        baseline.choose.signature.instructions.strip()
+                        == candidate.choose.signature.instructions.strip()
+                        and baseline.write.signature.instructions.strip()
+                        == candidate.write.signature.instructions.strip()
+                    ):
+                        result = {
+                            "run": str(run_dir),
+                            "prompt_changed": False,
+                            "improved": False,
+                            "experiments": {},
+                            "reason": "GEPA kept the seed; held-out test skipped",
+                        }
+                    else:
+                        require_provider_keys(settings, braintrust=True)
+                        check = check_judge(
+                            val, judge, max(0.8, settings.min_judge_agreement)
+                        )
+                        result = publish_experiments(
+                            settings,
+                            test,
+                            baseline,
+                            candidate,
+                            judge,
+                            run_dir,
+                            manifest["dataset_version"],
+                            check["agreement"],
+                        )
         print(json.dumps(result, indent=2))
     except (ValueError, OSError) as error:
         parser.exit(1, f"llm-optmiser: {error}\n")

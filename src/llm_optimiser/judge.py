@@ -63,6 +63,19 @@ class LineJudge:
 Judge = Callable[[ReviewCase, str], tuple[float, str]]
 
 
+def cache_judge(judge: Judge) -> Judge:
+    """Keep one score for each case and line during this run."""
+    scores: dict[tuple[str, str], tuple[float, str]] = {}
+
+    def score_once(case: ReviewCase, line: str) -> tuple[float, str]:
+        key = (case.source_id, line)
+        if key not in scores:
+            scores[key] = judge(case, line)
+        return scores[key]
+
+    return score_once
+
+
 def check_judge(cases: list[ReviewCase], judge: Judge, floor: float) -> dict[str, Any]:
     spoken = [case for case in cases if case.original_action == "speak"]
     labels = {case.luna_score for case in spoken}

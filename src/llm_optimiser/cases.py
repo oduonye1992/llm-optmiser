@@ -68,7 +68,14 @@ def _reasons(comments: Any) -> dict[str, str]:
         return {}
     found: dict[str, str] = {}
     for comment in comments:
-        text = comment.get("comment", "") if isinstance(comment, dict) else ""
+        if not isinstance(comment, dict):
+            continue
+        if (comment.get("metadata") or {}).get("reviewer") == "Codex":
+            continue
+        value = comment.get("comment")
+        text = value.get("text", "") if isinstance(value, dict) else value
+        if not isinstance(text, str):
+            continue
         for label, reason in re.findall(r"^(Jev|Luna):\s*(.+)$", text, re.MULTILINE):
             if label in found and found[label] != reason.strip():
                 raise ValueError("Conflicting review reasons on one row")
